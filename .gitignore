@@ -3,3 +3,4 @@
 *.onnx
 *.trt
 *.pyc
+*.plan
