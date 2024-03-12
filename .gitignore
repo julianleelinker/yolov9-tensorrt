@@ -4,3 +4,4 @@
 *.trt
 *.pyc
 *.plan
+samples/*
