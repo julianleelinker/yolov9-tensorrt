@@ -8,7 +8,7 @@ def create_attrs(topK, keepTopK):
     attrs = {}
     attrs["shareLocation"] = 1 # Default for yolor
     attrs["backgroundLabelId"] = -1
-    attrs["numClasses"] = 80
+    attrs["numClasses"] = 26
     attrs["topK"] = topK
     attrs["keepTopK"] = keepTopK
     attrs["scoreThreshold"] = 0.4

@@ -1,0 +1,21 @@
+pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
+pip install onnxruntime==1.16.3
+pip install onnx==1.15.0
+pip install requests
+pip install nvidia-pyindex
+pip install onnx-graphsurgeon
+pip install opencv-python-headless
+pip install pandas
+pip install IPython
+pip install psutil
+pip install pyyaml
+pip install tqdm
+pip install matplotlib
+pip install seaborn
+pip install ipdb
+
+python torch2onnx.py --weights c3-best.pt --output c3-best.onnx
+python add_nms_plugins.py --model c3-best.onnx 
+/usr/src/tensorrt/bin/trtexec --onnx=c3-best-nms.onnx --saveEngine=c3-best-nms.trt --minShapes=input:1x3x640x640 --optShapes=input:4x3x640x640 --maxShapes=input:4x3x640x640 --verbose --device=0
+
+python3 object_detector_trt_nms.py --weight c3-best-nms.trt --img_test tiip-s4-1000/1698908493037728.jpg
