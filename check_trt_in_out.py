@@ -33,6 +33,6 @@ class TRTloader:
     def inspect(self, ):
         import ipdb; ipdb.set_trace()
 
-engine_path = 'yolov9-c-nms.trt'
+engine_path = 'c3-best-nms.trt'
 loader = TRTloader(engine_path)
 loader.inspect()
