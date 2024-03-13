@@ -10,60 +10,32 @@ import random
 
 
 CLASS_LIST = [
-    # 'ANIMAL',
-    # 'BARRICADE',
-    # 'BICYCLE',
-    # 'BUS',
-    # 'BUS_STOP_SIGN',
-    # 'CAR',
-    # 'CONE',
-    # 'ETC',
-    # 'HUMAN_LIKE',
-    # 'JERSEY_BARRIER',
-    # 'MOTORCYCLE',
-    # 'NON_UPRIGHT',
-    # 'PEDESTRIAN',
-    # 'POLE',
-    # 'RIDER',
-    # 'ROAD_CRACKS',
-    # 'ROAD_PATCH',
-    # 'ROAD_POTHOLES',
-    # 'STOP_SIGN',
-    # 'TRAFFIC_LIGHT',
-    # 'TRAFFIC_SIGN',
-    # 'TRUCK',
-    # 'UNCLEAR_LANE_MARKING',
-    # 'UNCLEAR_ROAD_MARKING',
-    # 'UNCLEAR_STOP_LINE',
-    # 'WHEELCHAIR',
-
-    # old but wrong
-    'CAR',
-    'TRUCK',
-    'BUS',
-    'MOTORCYCLE',
-    'BICYCLE',
-    'WHEELCHAIR',
-    'ETC',
-    'PEDESTRIAN',
-    'NON_UPRIGHT',
-    'HUMAN_LIKE',
-    'RIDER',
     'ANIMAL',
-    'POLE',
-    'TRAFFIC_SIGN',
-    'TRAFFIC_LIGHT',
+    'BARRICADE',
+    'BICYCLE',
+    'BUS',
     'BUS_STOP_SIGN',
-    'STOP_SIGN',
+    'CAR',
+    'CONE',
+    'ETC',
+    'HUMAN_LIKE',
+    'JERSEY_BARRIER',
+    'MOTORCYCLE',
+    'NON_UPRIGHT',
+    'PEDESTRIAN',
+    'POLE',
+    'RIDER',
     'ROAD_CRACKS',
     'ROAD_PATCH',
     'ROAD_POTHOLES',
+    'STOP_SIGN',
+    'TRAFFIC_LIGHT',
+    'TRAFFIC_SIGN',
+    'TRUCK',
     'UNCLEAR_LANE_MARKING',
-    'UNCLEAR_STOP_LINE',
     'UNCLEAR_ROAD_MARKING',
-    'CONE',
-    'BARRICADE',
-    'JERSEY_BARRIER',
+    'UNCLEAR_STOP_LINE',
+    'WHEELCHAIR',
 ]
 
 ID_TO_CLASS = { i: CLASS_LIST[i] for i in range(len(CLASS_LIST)) }
@@ -96,6 +68,18 @@ def resize_box(box, org_size, new_size):
     return new_box
 
 
+def preprocess(img, imgsz=(640, 640)):
+    h, w, _ = img.shape
+    scale = min(imgsz[0]/w, imgsz[1]/h)
+    input_img = np.zeros((imgsz[1], imgsz[0], 3), dtype = np.float32)
+    nh = int(scale * h)
+    nw = int(scale * w)
+    input_img[: nh, :nw, :] = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (nw, nh))
+    input_img = input_img.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
+    input_img = np.expand_dims(input_img.transpose(2, 0, 1), 0)
+    return input_img, scale
+
+
 url = 'localhost:8001' 
 triton_client = grpcclient.InferenceServerClient(
     url=url,
@@ -115,22 +99,20 @@ out_root = '/home/julian/work/yolov9-tensorrt/triton-trt-infer'
 
 # load all *.jpg under image_root as list
 image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
+
 # select random 10 images
 # infer_list = np.random.choice(image_list, 10)
-infer_list = image_list[:10]
+# infer_list = image_list[:10]
+infer_list = image_list
 pathlib.Path(out_root).mkdir(exist_ok=True)
 
 total_elapsed_time_ns = 0
+colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(ID_TO_CLASS))]
+
 for image_path in infer_list:
-    # img_path = f'{image_root}/{image_name}.jpg'
-    img = cv2.imread(str(image_path))
-    org_img = img
-    im_shape = np.array([[float(img.shape[0]), float(img.shape[1])]]).astype('float32')
-    img = cv2.resize(img, (640, 640))
-    scale_factor = np.array([[float(640/img.shape[0]), float(640/img.shape[1])]]).astype('float32')
-    img = img.astype(np.float32) / 255.0
-    input_img = np.transpose(img, [2, 0, 1])
-    input_img = input_img[np.newaxis, :, :, :]
+    org_img = cv2.imread(str(image_path))
+    # org_img = org_img
+    input_img, scale = preprocess(org_img)
 
     model_name = 'yolov9'
     OUTPUT_NAMES = [
@@ -146,15 +128,20 @@ for image_path in infer_list:
     inputs = []
     outputs = []
     start_time = time.perf_counter_ns()
-    # inputs.append(grpcclient.InferInput(INPUT_NAMES[0], [1, 2], "INT32"))
-    # inputs.append(grpcclient.InferInput(INPUT_NAMES[1], [1, 3, width, height], "FP32"))
+
     inputs.append(grpcclient.InferInput(INPUT_NAMES[0], [1, 3, width, height], "FP32"))
+
+    # for batch infer
+    # inputs.append(grpcclient.InferInput(INPUT_NAMES[0], [3, 3, width, height], "FP32"))
 
     for output_name in OUTPUT_NAMES:
         outputs.append(grpcclient.InferRequestedOutput(output_name))
 
-    # inputs[0].set_data_from_numpy(np.array([[width, height]], dtype=np.int32))
-    # inputs[1].set_data_from_numpy(input_img.astype(np.float32))
+    # for batch infer
+    # input2 = np.copy(input_img)
+    # input3 = np.copy(input_img)
+    # input_img = np.vstack((input_img, input2, input3))
+
     inputs[0].set_data_from_numpy(input_img.astype(np.float32))
 
     results = triton_client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
@@ -163,20 +150,33 @@ for image_path in infer_list:
     total_elapsed_time_ns += elapsed_time_ns
     print(f"elapsed_time: {elapsed_time_ns} ns")
 
-    # labels, boxes, scores = results.as_numpy(OUTPUT_NAMES[0]), results.as_numpy(OUTPUT_NAMES[1]),results.as_numpy(OUTPUT_NAMES[2])
     num_dets, boxes, scores, labels = results.as_numpy(OUTPUT_NAMES[0]), results.as_numpy(OUTPUT_NAMES[1]),results.as_numpy(OUTPUT_NAMES[2]), results.as_numpy(OUTPUT_NAMES[3])
 
-    # import ipdb; ipdb.set_trace()
+    ## Apply NMS
+    # for batch infer, change first 0 to 0-2
+    num_detection = num_dets[0][0]
+    reshape_bboxes  = boxes[0]
+    nmsed_scores  = scores[0]
+    nmsed_classes  = labels[0]
+    print('Detected {} object(s)'.format(num_detection))
+    # Rescale boxes from img_size to im0 size
+    _, _, height, width = input_img.shape
+    h, w, _ = org_img.shape
 
-    confidence_threshold = 0.1**3
-    print(confidence_threshold)
+    reshape_bboxes = np.copy(reshape_bboxes)
+    reshape_bboxes[:, 0] /= scale
+    reshape_bboxes[:, 1] /= scale
+    reshape_bboxes[:, 2] /= scale
+    reshape_bboxes[:, 3] /= scale
+    org_img = org_img.copy()
+    for ix in range(num_detection):       # x1, y1, x2, y2 in pixel format
+        cls_id = int(nmsed_classes[ix])
+        label = '%s %.2f' % (ID_TO_CLASS[cls_id], nmsed_scores[ix])
+        x1, y1, x2, y2 = reshape_bboxes[ix]
 
-    for label, box, score in zip(labels[0], boxes[0], scores[0]):
-        if score < confidence_threshold:
-            continue
-        label = f'{ID_TO_CLASS[int(label)][:3]} {score:.2f}'
-        resized_box = resize_box(box, (640, 640), org_img.shape[:2])
-        plot_one_box(resized_box, org_img, label=label, color=(255, 0, 0), line_thickness=2)
+        cv2.rectangle(org_img, (int(x1), int(y1)), (int(x2), int(y2)), colors[int(cls_id)], 2)
+        cv2.putText(org_img, label, (int(x1), int(y1-10)), cv2.FONT_HERSHEY_SIMPLEX, 1, colors[int(cls_id)], 2, cv2.LINE_AA)
+
     image_name = pathlib.Path(image_path).stem
     cv2.imwrite(f'{out_root}/{image_name}.jpg', org_img)
     print(f'{out_root}/{image_name}.jpg')
