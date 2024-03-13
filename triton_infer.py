@@ -91,8 +91,11 @@ triton_client = grpcclient.InferenceServerClient(
 # image_root = '/home/julian/data/indus-innov/raw-data/convert_data/01_10_2024/sensor_raw-01_10_2024-16_54_16/'
 # image_root = '/home/julian/data/indus-innov/raw-data/convert_data/01_10_2024/sensor_raw-01_10_2024-16_22_58/'
 # image_root = '/home/julian/data/indus-innov/0216/images_0216/kaohsiung5gsmartcitydemo/tiip-s4-1000/tiip-s4-1000/'
-image_root = '/home/julian/data/indus-innov/images/kaohsiung5gsmartcitydemo/tiip-s4-1000/tiip-s4-1000/'
-out_root = '/home/julian/work/yolov9-tensorrt/triton-trt-infer'
+# image_root = '/home/julian/data/indus-innov/images/kaohsiung5gsmartcitydemo/tiip-s4-1000/tiip-s4-1000/'
+image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on my orin
+# out_root = '/home/julian/work/yolov9-tensorrt/triton-trt-infer'
+out_root = '/home/ubuntu/julian/tiip/infer/' # on my orin
+model_name = 'yolov9-c3'
 
 
 # load all *.jpg under image_root as list
@@ -112,7 +115,6 @@ for image_path in infer_list:
     # org_img = org_img
     input_img, scale = preprocess(org_img)
 
-    model_name = 'yolov9'
     OUTPUT_NAMES = [
         "num_detections",
         "nmsed_boxes",
