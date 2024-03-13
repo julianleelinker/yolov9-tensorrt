@@ -5,3 +5,4 @@
 *.pyc
 *.plan
 samples/*
+triton-trt-infer/*
