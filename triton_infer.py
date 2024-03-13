@@ -1,9 +1,7 @@
 # %%
-import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import InferenceServerException
 import pathlib
 import time
 import random
