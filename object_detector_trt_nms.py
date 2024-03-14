@@ -3,7 +3,7 @@ import os
 import platform
 import shutil
 import time
-from pathlib import Path
+import pathlib
 
 import cv2
 import numpy as np
@@ -294,9 +294,9 @@ class YOLOv9(object):
         inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
 
         ## Inference
-        t1 = time.time()
+        t1 = time.perf_counter_ns()
         num_detection, nmsed_bboxes, nmsed_scores, nmsed_classes = self.model.run(inp)
-        t2 = time.time()
+        t2 = time.perf_counter_ns()
 
         ## Apply NMS
         num_detection = num_detection[0][0]
@@ -320,8 +320,7 @@ class YOLOv9(object):
             cv2.rectangle(visualize_img, (int(x1), int(y1)), (int(x2), int(y2)), self.colors[int(cls)], 2)
             cv2.putText(visualize_img, label, (int(x1), int(y1-10)), cv2.FONT_HERSHEY_SIMPLEX, 1, self.colors[int(cls)], 2, cv2.LINE_AA)
 
-        cv2.imwrite('result.jpg', visualize_img)
-        return visualize_img
+        return visualize_img, t2-t1
 
 if __name__ == '__main__':
     import argparse
@@ -329,9 +328,33 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights/best.pt', help='weights path')
     parser.add_argument('--classes', type=str, default='data/coco.names', help='classes name file path')
     parser.add_argument('--max_size', type=int, default=640, help='max size of input image')
-    parser.add_argument('--img_test', type=str, default='images/zidane.jpg', help='image test path')
+    # parser.add_argument('--img_test', type=str, default='images/zidane.jpg', help='image test path')
     opt = parser.parse_args()
 
     model = YOLOv9(opt.weights, opt.max_size, opt.classes)
-    img = cv2.imread(opt.img_test)
-    model.detect(img)
+
+
+
+    image_root = 'images/samples'
+    out_root = 'images/infer' # on my orin
+    image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
+
+    # select random 100 images
+    num_data = 100
+    infer_list = np.random.choice(image_list, 100)
+    # infer_list = image_list[:100]
+    # infer_list = image_list
+    pathlib.Path(out_root).mkdir(exist_ok=True)
+
+    total_elapsed_time_ns = 0
+    for image_path in infer_list:
+        img = cv2.imread(str(image_path))
+        result_img, infer_time = model.detect(img)
+        image_name = pathlib.Path(image_path).stem
+        cv2.imwrite(f'{out_root}/{image_name}.jpg', result_img)
+        print(f'{out_root}/{image_name}.jpg')
+        total_elapsed_time_ns += infer_time
+
+    num_data = len(infer_list)
+    avg_elapsed_time_sec = total_elapsed_time_ns / 1_000_000_000 / num_data
+    print(f"averaged infer time: ({avg_elapsed_time_sec} seconds) ({num_data} samples)")
