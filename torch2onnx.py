@@ -5,17 +5,47 @@ import argparse
 import onnx_graphsurgeon as gs 
 from onnx import shape_inference
 import torch.nn as nn
+from torchvision import transforms
+import numpy as np
+from PIL import Image
 
-class YOLOv9AddNMS(nn.Module):
+class YOLOv9end2end(nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
         self.model.eval()
+        self.scale = 1/3.
+        self.nw, self.nh = 640, 426
+        self.padding_right = 640 - self.nw 
+        self.padding_bottom = 640 - self.nh
+        self.resize_transform = transforms.Resize((self.nh, self.nw))
+
+
+
+
 
     def forward(self, input):
         """ 
             Split output [n_batch, n_bboxes, 85] to 3 output: bboxes, scores, classes
         """ 
+
+        input = input[:, :, :, [2, 1, 0]]
+    
+        # Normalize the tensor to have values between [0, 1]
+        input = input.div(255.0)
+    
+        # Permute the tensor dimensions from BHWC to BCHW
+        # Adjust the permute operation to accommodate the batch dimension
+        input = input.permute(0, 3, 1, 2)
+        # Resize
+        input = transforms.functional.resize(input, [self.nh, self.nw])
+        # Pad
+        # padding_right = self.imgsz[0] - self.nw 
+        # padding_bottom = self.imgsz[1] - self.nh
+        input = torch.nn.functional.pad(input, (0, self.padding_right, 0, self.padding_bottom))
+
+
+
         # x, y, w, h -> x1, y1, x2, y2
         output = self.model(input)
         # print('Output: ', len(output))
@@ -58,8 +88,10 @@ if __name__ == '__main__':
 
     # load model 
     model = attempt_load(model_weights, device=device, inplace=True, fuse=True)
+    model = YOLOv9end2end(model)
     model.eval()
-    img = torch.zeros(1, 3, max_size, max_size).to(device)
+    # img = torch.zeros(1, 3, max_size, max_size).to(device)
+    img = torch.zeros(1, 1280, 1920, 3).to(device)
     
     for k, m in model.named_modules():
         m.export = True
@@ -67,7 +99,6 @@ if __name__ == '__main__':
     for _ in range(2):
         y = model(img)  # dry runs
     print('[INFO] Convert from Torch to ONNX')
-    model = YOLOv9AddNMS(model)
     model.to(device).eval()
 
     torch.onnx.export(model,               # model being run

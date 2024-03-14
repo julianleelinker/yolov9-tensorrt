@@ -80,16 +80,20 @@ def allocate_buffers_nms(engine):
     out_shapes = []
     input_shapes = []
     out_names = []
-    max_batch_size = engine.get_profile_shape(0, 0)[2][0]
+    # max_batch_size = engine.get_profile_shape(0, 0)[2][0]
+    max_batch_size = 3
     print('Profile shape: ', engine.get_profile_shape(0, 0))
+    # import ipdb; ipdb.set_trace()
     # max_batch_size = 1
     for binding in engine:
         binding_shape = engine.get_binding_shape(binding)
         print('binding:', binding, '- binding_shape:', binding_shape)
         #Fix -1 dimension for proper memory allocation for batch_size > 1
         if binding == 'input':
-            max_width = engine.get_profile_shape(0, 0)[2][3]
-            max_height = engine.get_profile_shape(0, 0)[2][2]
+            # max_width = engine.get_profile_shape(0, 0)[2][3]
+            # max_height = engine.get_profile_shape(0, 0)[2][2]
+            max_width = 1920
+            max_height = 1280
             size = max_batch_size * max_width * max_height * 3
         else:
             binding_shape = (max_batch_size,) + binding_shape[1:]
@@ -148,7 +152,7 @@ class TrtModel(object):
         print('Maximum boxes: {}'.format(self.max_boxes))
         self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size = \
                 allocate_buffers(self.engine, max_boxes = self.max_boxes, total_classes = self.total_classes)
-        # print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
+        print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
         self.context = self.engine.create_execution_context()
         self.context.active_optimization_profile = 0
 
@@ -204,7 +208,7 @@ class TrtModelNMS(object):
         # Allocate
         self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size = \
                 allocate_buffers_nms(self.engine)
-        # print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
+        print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
         self.context = self.engine.create_execution_context()
         self.context.active_optimization_profile = 0
 
@@ -216,9 +220,10 @@ class TrtModelNMS(object):
         input = np.asarray(input)
         batch_size, _, im_height, im_width = input.shape
         assert batch_size <= self.max_batch_size
-        assert max(im_width, im_height) <= self.max_size, "Invalid shape: {}x{}, max shape: {}".format(im_width, im_height, self.max_size)
+        # assert max(im_width, im_height) <= self.max_size, "Invalid shape: {}x{}, max shape: {}".format(im_width, im_height, self.max_size)
         allocate_place = np.prod(input.shape)
         # print('allocate_place', input.shape)
+        # import ipdb; ipdb.set_trace()
         self.inputs[0].host[:allocate_place] = input.flatten(order='C').astype(np.float32)
         self.context.set_binding_shape(0, input.shape)
         trt_outputs = do_inference(
@@ -278,7 +283,7 @@ def load_classes(path):
 class YOLOv9(object):
     def __init__(self, 
             model_weights = 'weights/yolov5-nms.trt', 
-            max_size = 640, 
+            max_size = 1920, 
             names = 'data/coco.names'):
         self.names = load_classes(names)
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.names))]
@@ -338,6 +343,7 @@ class YOLOv9(object):
 
 
         img_tensor = img_tensor.unsqueeze(0)
+        inp = img_tensor
 
 
 
@@ -345,23 +351,23 @@ class YOLOv9(object):
 
         # Convert BGR to RGB by rearranging the channels
         # Note: Now we rearrange the last dimension, since we have a batch dimension at the beginning
-        img_tensor = img_tensor[:, :, :, [2, 1, 0]]
+        # img_tensor = img_tensor[:, :, :, [2, 1, 0]]
     
-        # Normalize the tensor to have values between [0, 1]
-        img_tensor = img_tensor.div(255.0)
+        # # Normalize the tensor to have values between [0, 1]
+        # img_tensor = img_tensor.div(255.0)
     
-        # Permute the tensor dimensions from BHWC to BCHW
-        # Adjust the permute operation to accommodate the batch dimension
-        img_tensor = img_tensor.permute(0, 3, 1, 2)
+        # # Permute the tensor dimensions from BHWC to BCHW
+        # # Adjust the permute operation to accommodate the batch dimension
+        # img_tensor = img_tensor.permute(0, 3, 1, 2)
 
         
-        # Resize
-        img_resized = transforms.functional.resize(img_tensor, [nh, nw])
+        # # Resize
+        # img_resized = transforms.functional.resize(img_tensor, [nh, nw])
         
-        # Pad
-        padding_right = self.imgsz[0] - nw 
-        padding_bottom = self.imgsz[1] - nh
-        inp = torch.nn.functional.pad(img_resized, (0, padding_right, 0, padding_bottom))
+        # # Pad
+        # padding_right = self.imgsz[0] - nw 
+        # padding_bottom = self.imgsz[1] - nh
+        # inp = torch.nn.functional.pad(img_resized, (0, padding_right, 0, padding_bottom))
 
 
 
