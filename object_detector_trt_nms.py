@@ -16,6 +16,7 @@ import tensorrt as trt
 
 import torch
 from torchvision import transforms
+from torch.nn import functional
 from PIL import Image
 
 
@@ -297,6 +298,7 @@ class YOLOv9(object):
         inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB), (nw, nh))
         inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
         inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
+        '''
 
 
 
@@ -325,6 +327,42 @@ class YOLOv9(object):
 
         # Add a batch dimension
         inp = inp.unsqueeze(0)
+        '''
+
+        nh = 426
+        nw = 640
+
+        # Convert the BGR image to a tensor
+        img_tensor = torch.from_numpy(bgr_img).float()
+    
+
+
+        img_tensor = img_tensor.unsqueeze(0)
+
+
+
+
+
+        # Convert BGR to RGB by rearranging the channels
+        # Note: Now we rearrange the last dimension, since we have a batch dimension at the beginning
+        img_tensor = img_tensor[:, :, :, [2, 1, 0]]
+    
+        # Normalize the tensor to have values between [0, 1]
+        img_tensor = img_tensor.div(255.0)
+    
+        # Permute the tensor dimensions from BHWC to BCHW
+        # Adjust the permute operation to accommodate the batch dimension
+        img_tensor = img_tensor.permute(0, 3, 1, 2)
+
+        
+        # Resize
+        img_resized = transforms.functional.resize(img_tensor, [nh, nw])
+        
+        # Pad
+        padding_right = self.imgsz[0] - nw 
+        padding_bottom = self.imgsz[1] - nh
+        inp = torch.nn.functional.pad(img_resized, (0, padding_right, 0, padding_bottom))
+
 
 
 
