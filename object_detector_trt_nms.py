@@ -14,6 +14,10 @@ import pycuda.autoinit
 import numpy as np
 import tensorrt as trt
 
+import torch
+from torchvision import transforms
+from PIL import Image
+
 
 TRT_LOGGER = trt.Logger()
 trt.init_libnvinfer_plugins(TRT_LOGGER, '')
@@ -282,8 +286,9 @@ class YOLOv9(object):
         self.model = TrtModelNMS(model_weights, max_size)
 
 
-    def detect(self, bgr_img):   
+    def detect(self, bgr_img, image):   
         ## Padded resize
+        '''
         h, w, _ = bgr_img.shape
         scale = min(self.imgsz[0]/w, self.imgsz[1]/h)
         inp = np.zeros((self.imgsz[1], self.imgsz[0], 3), dtype = np.float32)
@@ -292,6 +297,36 @@ class YOLOv9(object):
         inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB), (nw, nh))
         inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
         inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
+
+
+
+
+        '''
+        # Calculate the scale to resize the image
+        # w, h = image.size
+        # scale = min(self.imgsz[0] / w, self.imgsz[1] / h)
+        # print(scale)
+        # print(nw, nh)
+
+        scale = 1/3.
+        nw, nh = 640, 426
+
+        # Resize the image and convert it to tensor
+        resize_transform = transforms.Resize((nh, nw))
+        image = resize_transform(image)
+
+        # Convert to tensor
+        inp = transforms.ToTensor()(image)
+
+        # Pad the image to the target size
+        padding_right = self.imgsz[0] - nw 
+        padding_bottom = self.imgsz[1] - nh
+        inp = torch.nn.functional.pad(inp, (0, padding_right, 0, padding_bottom))
+
+        # Add a batch dimension
+        inp = inp.unsqueeze(0)
+
+
 
         ## Inference
         t1 = time.perf_counter_ns()
@@ -349,7 +384,8 @@ if __name__ == '__main__':
     total_elapsed_time_ns = 0
     for image_path in infer_list:
         img = cv2.imread(str(image_path))
-        result_img, infer_time = model.detect(img)
+        image = Image.open(str(image_path)).convert("RGB")
+        result_img, infer_time = model.detect(img, image)
         image_name = pathlib.Path(image_path).stem
         cv2.imwrite(f'{out_root}/{image_name}.jpg', result_img)
         print(f'{out_root}/{image_name}.jpg')
