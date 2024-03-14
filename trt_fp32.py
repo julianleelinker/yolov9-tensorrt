@@ -90,7 +90,9 @@ class MNISTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
 
             # Allocate enough memory for a whole batch.
             self.data = load_yolov7_coco_image(training_data, 1000)
+            print(self.data[0].nbytes * self.batch_size)
             self.device_input = cuda.mem_alloc(self.data[0].nbytes * self.batch_size)
+            print('DONE mem')
 
     def get_batch_size(self):
         return self.batch_size
@@ -141,6 +143,25 @@ def build_int8_engine(onnx_file, calib, batch_size=32):
         return bytes(plan)
 
 
+def build_fp32_engine(onnx_file, batch_size=32):
+    with trt.Builder(
+        TRT_LOGGER
+    ) as builder, builder.create_network(1) as network, builder.create_builder_config() as config:
+        # We set the builder batch size to be the same as the calibrator's, as we use the same batches
+        # during inference. Note that this is not required in general, and inference batch size is
+        # independent of calibration batch size.
+        builder.max_batch_size = batch_size
+        config.max_workspace_size = 1024 * 1024 * 1024  # 1024 MB
+        # config.set_flag(trt.BuilderFlag.INT8)
+        # config.int8_calibrator = calib
+        with trt.OnnxParser(network, TRT_LOGGER) as parser:
+            parser.parse_from_file(onnx_file)
+        # network.mark_output(model_tensors.find(ModelData.OUTPUT_NAME))
+        # Build engine and do int8 calibration.
+        plan = builder.build_serialized_network(network, config)
+        return bytes(plan)
+
+
 def replace_suffix(file, new_suffix):
     r = file.rfind(".")
     return f"{file[:r]}{new_suffix}"
@@ -149,14 +170,17 @@ def replace_suffix(file, new_suffix):
 def main():
     # Now we create a calibrator and give it the location of our calibration data.
     # We also allow it to cache calibration data for faster engine building.
-    onnxfile          = "yolov7.onnx"
+    onnxfile          = "fp32-nms.onnx"
     calibration_cache = replace_suffix(onnxfile, ".cache")
     engine_file       = replace_suffix(onnxfile, ".engine")
-    calib = MNISTEntropyCalibrator("/datav/dataset/coco/images/train2017/", cache_file=calibration_cache)
+    calib = MNISTEntropyCalibrator("calib_data/", cache_file=calibration_cache)
 
     # Inference batch size can be different from calibration batch size.
     batch_size = 1
     engine_data = build_int8_engine(onnxfile, calib, batch_size)
+
+    # batch_size = 3
+    # engine_data = build_fp32_engine(onnxfile, batch_size)
 
     with open(engine_file, "wb") as f:
         f.write(engine_data)
