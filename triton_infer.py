@@ -182,5 +182,5 @@ for image_path in infer_list:
     print(f'{out_root}/{image_name}.jpg')
 
 num_data = len(infer_list)
-elapsed_time_sec = total_elapsed_time_ns / 1_000_000_000 / num_data
-print(f"averaged infer time: {elapsed_time_ns} ns ({elapsed_time_sec} seconds) ({num_data} samples)")
+avg_elapsed_time_sec = total_elapsed_time_ns / 1_000_000_000 / num_data
+print(f"averaged infer time: ({avg_elapsed_time_sec} seconds) ({num_data} samples)")
