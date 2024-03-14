@@ -24,7 +24,7 @@ class YOLOv9AddNMS(nn.Module):
                 print([y.shape for y in x])
             else:
                 print('type x ', type(x))
-        output = output[0]
+        # output = output[0] # only for unconverted model
         output = output.permute(0, 2, 1)
         print("[INFO] Output's origin model shape: ",output.shape)
         bboxes_x = output[..., 0:1]
