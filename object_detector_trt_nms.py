@@ -342,10 +342,11 @@ class YOLOv9(object):
         # Rescale boxes from img_size to im0 size
         _, _, height, width = inp.shape
         h, w, _ = bgr_img.shape
-        nmsed_bboxes[:, 0] /= scale
-        nmsed_bboxes[:, 1] /= scale
-        nmsed_bboxes[:, 2] /= scale
-        nmsed_bboxes[:, 3] /= scale
+        # nmsed_bboxes[:, 0] /= scale
+        # nmsed_bboxes[:, 1] /= scale
+        # nmsed_bboxes[:, 2] /= scale
+        # nmsed_bboxes[:, 3] /= scale
+        # nmsed_bboxes /= scale
         visualize_img = bgr_img.copy()
         for ix in range(num_detection):       # x1, y1, x2, y2 in pixel format
             cls = int(nmsed_classes[ix])

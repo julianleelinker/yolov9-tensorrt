@@ -37,6 +37,7 @@ class YOLOv9AddNMS(nn.Module):
         bboxes_y2 = bboxes_y + bboxes_h/2
         bboxes = torch.cat([bboxes_x1, bboxes_y1, bboxes_x2, bboxes_y2], dim = -1)
         bboxes = bboxes.unsqueeze(2) # [n_batch, n_bboxes, 4] -> [n_batch, n_bboxes, 1, 4]
+        bboxes /= self.scale
         obj_conf = output[..., 4:]
         scores = obj_conf
         return bboxes, scores
