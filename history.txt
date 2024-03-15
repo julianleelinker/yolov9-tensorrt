@@ -19,3 +19,14 @@ python add_nms_plugins.py --model c3-best.onnx
 /usr/src/tensorrt/bin/trtexec --onnx=c3-best-nms.onnx --saveEngine=c3-best-nms.trt --minShapes=input:1x3x640x640 --optShapes=input:3x3x640x640 --maxShapes=input:4x3x640x640 --verbose --device=0
 
 python3 object_detector_trt_nms.py --classes data/tiip.names --weight c3-best-nms.trt --img_test images/samples/1698908493037728.jpg 
+
+
+
+/usr/src/tensorrt/bin/trtexec --onnx=c3-converted-e2e-nms.onnx --saveEngine=c3-converted-e2e-nms.trt --minShapes=input:1x1280x1920x3 --maxShapes=input:3x1280x1920x3 --optShapes=input:3x1280x1920x3 --verbose --device=0
+python3 object_detector_trt_nms.py --classes data/tiip.names --weight c3-converted-e2e-nms.trt --e2e
+
+
+unconverted 36 ms
+converted 30 ms
+add postprocess 30 ms
+add preprocess 45 ms
