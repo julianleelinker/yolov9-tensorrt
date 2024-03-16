@@ -120,10 +120,10 @@ if __name__ == '__main__':
     model = attempt_load(model_weights, device=device, inplace=True, fuse=True)
     if opt.e2e:
         model = YOLOv9end2end(model)
-        img = torch.zeros(1, 3, max_size, max_size).to(device)
+        img = torch.zeros(1, 1280, 1920, 3).to(device)
     else:
         model = YOLOv9AddNMS(model)
-        img = torch.zeros(1, 1280, 1920, 3).to(device)
+        img = torch.zeros(1, 3, max_size, max_size).to(device)
     model.eval()
     
     for k, m in model.named_modules():

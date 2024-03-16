@@ -22,8 +22,19 @@ python3 object_detector_trt_nms.py --classes data/tiip.names --weight c3-best-nm
 
 
 
+# converted end-to-end version
+python torch2onnx.py --weights c3-converted.pt --output c3-converted-e2e.onnx --e2e
+python add_nms_plugins.py --model c3-converted-e2e.onnx 
 /usr/src/tensorrt/bin/trtexec --onnx=c3-converted-e2e-nms.onnx --saveEngine=c3-converted-e2e-nms.trt --minShapes=input:1x1280x1920x3 --maxShapes=input:3x1280x1920x3 --optShapes=input:3x1280x1920x3 --verbose --device=0
 python3 object_detector_trt_nms.py --classes data/tiip.names --weight c3-converted-e2e-nms.trt --e2e
+
+
+
+python torch2onnx.py --weights c7-converted.pt --output c7-converted.onnx
+python add_nms_plugins.py --model c7-converted.onnx
+/usr/src/tensorrt/bin/trtexec --onnx=c7-converted-nms.onnx --saveEngine=c7-converted-nms.trt --minShapes=input:1x640x640x3 --maxShapes=input:3x640x640x3 --optShapes=input:3x640x640x3 --verbose --device=0
+/usr/src/tensorrt/bin/trtexec --onnx=c7-converted-nms.onnx --saveEngine=c7-converted-nms.trt --minShapes=input:1x3x640x640 --maxShapes=input:3x3x640x640 --optShapes=input:3x3x640x640 --verbose --device=0
+python3 object_detector_trt_nms.py --classes data/tiip.names --weight c7-converted-nms.trt
 
 
 unconverted 36 ms
