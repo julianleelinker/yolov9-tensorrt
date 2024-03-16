@@ -16,6 +16,7 @@ import tensorrt as trt
 
 import torch
 from torchvision import transforms
+from torch.nn import functional
 from PIL import Image
 
 
@@ -71,7 +72,7 @@ def allocate_buffers(engine, max_boxes, total_classes):
             out_names.append(binding)
     return inputs, outputs, bindings, stream, input_shapes, out_shapes, out_names, max_batch_size
 
-def allocate_buffers_nms(engine):
+def allocate_buffers_nms(engine, max_width, max_height, max_batch_size):
     inputs = []
     outputs = []
     bindings = []
@@ -79,16 +80,17 @@ def allocate_buffers_nms(engine):
     out_shapes = []
     input_shapes = []
     out_names = []
-    max_batch_size = engine.get_profile_shape(0, 0)[2][0]
+    # max_batch_size = engine.get_profile_shape(0, 0)[2][0]
     print('Profile shape: ', engine.get_profile_shape(0, 0))
+    # import ipdb; ipdb.set_trace()
     # max_batch_size = 1
     for binding in engine:
         binding_shape = engine.get_binding_shape(binding)
         print('binding:', binding, '- binding_shape:', binding_shape)
         #Fix -1 dimension for proper memory allocation for batch_size > 1
         if binding == 'input':
-            max_width = engine.get_profile_shape(0, 0)[2][3]
-            max_height = engine.get_profile_shape(0, 0)[2][2]
+            # max_width = engine.get_profile_shape(0, 0)[2][3]
+            # max_height = engine.get_profile_shape(0, 0)[2][2]
             size = max_batch_size * max_width * max_height * 3
         else:
             binding_shape = (max_batch_size,) + binding_shape[1:]
@@ -147,7 +149,7 @@ class TrtModel(object):
         print('Maximum boxes: {}'.format(self.max_boxes))
         self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size = \
                 allocate_buffers(self.engine, max_boxes = self.max_boxes, total_classes = self.total_classes)
-        # print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
+        print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
         self.context = self.engine.create_execution_context()
         self.context.active_optimization_profile = 0
 
@@ -184,7 +186,7 @@ class TrtModel(object):
 
 
 class TrtModelNMS(object):
-    def __init__(self, model, max_size):
+    def __init__(self, model, max_size, max_width, max_height, max_batch_size):
         self.engine_file = model
         self.engine = None
         self.inputs = None
@@ -194,16 +196,19 @@ class TrtModelNMS(object):
         self.context = None
         self.input_shapes = None
         self.out_shapes = None
-        self.max_batch_size = 1
         self.max_size = max_size
+
+        self.max_width = max_width
+        self.max_height = max_height
+        self.max_batch_size = max_batch_size
 
     def build(self):
         with open(self.engine_file, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
             self.engine = runtime.deserialize_cuda_engine(f.read())
         # Allocate
         self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size = \
-                allocate_buffers_nms(self.engine)
-        # print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
+                allocate_buffers_nms(self.engine, max_width=self.max_width, max_height=self.max_height, max_batch_size=self.max_batch_size)
+        print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
         self.context = self.engine.create_execution_context()
         self.context.active_optimization_profile = 0
 
@@ -215,9 +220,10 @@ class TrtModelNMS(object):
         input = np.asarray(input)
         batch_size, _, im_height, im_width = input.shape
         assert batch_size <= self.max_batch_size
-        assert max(im_width, im_height) <= self.max_size, "Invalid shape: {}x{}, max shape: {}".format(im_width, im_height, self.max_size)
+        # assert max(im_width, im_height) <= self.max_size, "Invalid shape: {}x{}, max shape: {}".format(im_width, im_height, self.max_size)
         allocate_place = np.prod(input.shape)
         # print('allocate_place', input.shape)
+        # import ipdb; ipdb.set_trace()
         self.inputs[0].host[:allocate_place] = input.flatten(order='C').astype(np.float32)
         self.context.set_binding_shape(0, input.shape)
         trt_outputs = do_inference(
@@ -276,56 +282,37 @@ def load_classes(path):
 
 class YOLOv9(object):
     def __init__(self, 
+            max_width,
+            max_height,
+            end2end,
+            max_batch_size,
             model_weights = 'weights/yolov5-nms.trt', 
-            max_size = 640, 
-            names = 'data/coco.names'):
+            names = 'data/coco.names',
+            ):
         self.names = load_classes(names)
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.names))]
+        max_size = max(max_width, max_height)
         self.imgsz = (max_size, max_size)
         # Load model
-        self.model = TrtModelNMS(model_weights, max_size)
+        self.model = TrtModelNMS(model_weights, max_size, max_width=max_width, max_height=max_height, max_batch_size=max_batch_size)
+        self.end2end = end2end
 
 
-    def detect(self, bgr_img, image):   
-        ## Padded resize
-        '''
-        h, w, _ = bgr_img.shape
-        scale = min(self.imgsz[0]/w, self.imgsz[1]/h)
-        inp = np.zeros((self.imgsz[1], self.imgsz[0], 3), dtype = np.float32)
-        nh = int(scale * h)
-        nw = int(scale * w)
-        inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB), (nw, nh))
-        inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
-        inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
-
-
-
-
-        '''
-        # Calculate the scale to resize the image
-        # w, h = image.size
-        # scale = min(self.imgsz[0] / w, self.imgsz[1] / h)
-        # print(scale)
-        # print(nw, nh)
-
-        scale = 1/3.
-        nw, nh = 640, 426
-
-        # Resize the image and convert it to tensor
-        resize_transform = transforms.Resize((nh, nw))
-        image = resize_transform(image)
-
-        # Convert to tensor
-        inp = transforms.ToTensor()(image)
-
-        # Pad the image to the target size
-        padding_right = self.imgsz[0] - nw 
-        padding_bottom = self.imgsz[1] - nh
-        inp = torch.nn.functional.pad(inp, (0, padding_right, 0, padding_bottom))
-
-        # Add a batch dimension
-        inp = inp.unsqueeze(0)
-
+    def detect(self, bgr_img):   
+        if self.end2end:
+            # Convert the BGR image to a tensor
+            inp = torch.from_numpy(bgr_img).float()
+            inp = inp.unsqueeze(0)
+        else:
+            ## Padded resize
+            h, w, _ = bgr_img.shape
+            scale = min(self.imgsz[0]/w, self.imgsz[1]/h)
+            inp = np.zeros((self.imgsz[1], self.imgsz[0], 3), dtype = np.float32)
+            nh = int(scale * h)
+            nw = int(scale * w)
+            inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB), (nw, nh))
+            inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
+            inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
 
 
         ## Inference
@@ -342,11 +329,10 @@ class YOLOv9(object):
         # Rescale boxes from img_size to im0 size
         _, _, height, width = inp.shape
         h, w, _ = bgr_img.shape
-        # nmsed_bboxes[:, 0] /= scale
-        # nmsed_bboxes[:, 1] /= scale
-        # nmsed_bboxes[:, 2] /= scale
-        # nmsed_bboxes[:, 3] /= scale
-        # nmsed_bboxes /= scale
+
+        if not self.end2end:
+            nmsed_bboxes /= scale
+
         visualize_img = bgr_img.copy()
         for ix in range(num_detection):       # x1, y1, x2, y2 in pixel format
             cls = int(nmsed_classes[ix])
@@ -363,12 +349,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='weights/best.pt', help='weights path')
     parser.add_argument('--classes', type=str, default='data/coco.names', help='classes name file path')
-    parser.add_argument('--max_size', type=int, default=640, help='max size of input image')
+    # parser.add_argument('--max_size', type=int, default=640, help='max size of input image')
+    parser.add_argument('--e2e', action='store_true', help='Enable end-to-end mode')
     # parser.add_argument('--img_test', type=str, default='images/zidane.jpg', help='image test path')
     opt = parser.parse_args()
 
-    model = YOLOv9(opt.weights, opt.max_size, opt.classes)
-
+    if opt.e2e:
+        model = YOLOv9(1920, 1280, True, 3, opt.weights, opt.classes)
+    else:
+        model = YOLOv9(640, 640, False, 4, opt.weights, opt.classes)
 
 
     image_root = 'images/samples'
@@ -385,8 +374,8 @@ if __name__ == '__main__':
     total_elapsed_time_ns = 0
     for image_path in infer_list:
         img = cv2.imread(str(image_path))
-        image = Image.open(str(image_path)).convert("RGB")
-        result_img, infer_time = model.detect(img, image)
+        # image = Image.open(str(image_path)).convert("RGB")
+        result_img, infer_time = model.detect(img)
         image_name = pathlib.Path(image_path).stem
         cv2.imwrite(f'{out_root}/{image_name}.jpg', result_img)
         print(f'{out_root}/{image_name}.jpg')
