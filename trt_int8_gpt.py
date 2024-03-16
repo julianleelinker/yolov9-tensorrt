@@ -106,7 +106,7 @@ def load_yolov7_coco_image(cocodir, topn = None):
         inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (nw, nh))
         inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
         inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
-        print(np.mean(inp))
+        # print(np.mean(inp))
         datas.append(inp)
         
     return np.concatenate(datas, axis=0)
@@ -199,12 +199,14 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
             f.write(engine.serialize())
 
 def main():
-    onnx_file_path = 'fp32-nms.onnx'
+    # onnx_file_path = 'fp32-nms.onnx'
+    model_name = 'c7-converted'
+    onnx_file_path = f'{model_name}.onnx'
     input_shape = (1, 3, 640, 640)  # Adjust based on your calibration dataset
 
-    calibration_cache = 'int8-nms.cache'
-    engine_file_path  = 'int8-nms.trt'
-    calibrator = MNISTEntropyCalibrator("samples/", cache_file=calibration_cache)
+    calibration_cache = f'{model_name}-int8.cache'
+    engine_file_path  = f'{model_name}-int8.trt'
+    calibrator = MNISTEntropyCalibrator("images/samples/", cache_file=calibration_cache)
 
     # calibration_dataset_path = 'path_to_your_calibration_dataset.npy'  # Update this path
     # calibrator = MyInt8Calibrator(CalibrationDataset(calibration_dataset_path), input_shape)
