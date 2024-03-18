@@ -1,8 +1,8 @@
 import tensorrt as trt
+import cv2
+import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
-import numpy as np
-import cv2
 
 import sys, os
 TRT_LOGGER = trt.Logger()
@@ -200,13 +200,17 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
 
 def main():
     # onnx_file_path = 'fp32-nms.onnx'
-    model_name = 'c7-converted'
+    # model_name = 'c7-converted'
+    model_name = '/home/ubuntu/julian/tiip/c7-converted'
     onnx_file_path = f'{model_name}.onnx'
     input_shape = (1, 3, 640, 640)  # Adjust based on your calibration dataset
 
     calibration_cache = f'{model_name}-int8.cache'
     engine_file_path  = f'{model_name}-int8.trt'
-    calibrator = MNISTEntropyCalibrator("images/samples/", cache_file=calibration_cache)
+
+    # calib_image_path = 'images/samples/'
+    calib_image_path = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/'
+    calibrator = MNISTEntropyCalibrator(calib_image_path, cache_file=calibration_cache)
 
     # calibration_dataset_path = 'path_to_your_calibration_dataset.npy'  # Update this path
     # calibrator = MyInt8Calibrator(CalibrationDataset(calibration_dataset_path), input_shape)
