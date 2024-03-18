@@ -41,3 +41,12 @@ unconverted 36 ms
 converted 30 ms
 add postprocess 30 ms
 add preprocess 45 ms
+
+
+# environment for running object_detector_trt_nms.py on orin
+sudo apt-get install python3-dev
+ls /usr/local/cuda-11.4/targets/aarch64-linux/lib
+sudo apt install libboost-all-dev --fix-missing
+export CPATH=$CPATH:/usr/local/cuda-11.4/targets/aarch64-linux/include
+export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/cuda-11.4/targets/aarch64-linux/lib
+pip install pycuda==2022.2

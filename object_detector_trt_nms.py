@@ -14,9 +14,9 @@ import pycuda.autoinit
 import numpy as np
 import tensorrt as trt
 
-import torch
-from torchvision import transforms
-from torch.nn import functional
+# import torch
+# from torchvision import transforms
+# from torch.nn import functional
 from PIL import Image
 
 
@@ -357,7 +357,7 @@ class YOLOv9(object):
     def detect(self, bgr_img):   
         if self.end2end:
             # Convert the BGR image to a tensor
-            inp = torch.from_numpy(bgr_img).float()
+            # inp = torch.from_numpy(bgr_img).float()
             inp = inp.unsqueeze(0)
         else:
             ## Padded resize
@@ -428,7 +428,8 @@ if __name__ == '__main__':
         model = YOLOv9(640, 640, False, 4, opt.weights, opt.classes)
 
 
-    image_root = 'images/samples'
+    # image_root = 'images/samples'
+    image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
     out_root = 'images/infer' # on my orin
     image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
 
