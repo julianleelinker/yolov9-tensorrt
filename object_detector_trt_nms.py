@@ -14,11 +14,6 @@ import pycuda.autoinit
 import numpy as np
 import tensorrt as trt
 
-# import torch
-# from torchvision import transforms
-# from torch.nn import functional
-from PIL import Image
-
 
 TRT_LOGGER = trt.Logger()
 trt.init_libnvinfer_plugins(TRT_LOGGER, '')
@@ -356,9 +351,8 @@ class YOLOv9(object):
 
     def detect(self, bgr_img):   
         if self.end2end:
-            # Convert the BGR image to a tensor
-            # inp = torch.from_numpy(bgr_img).float()
-            inp = inp.unsqueeze(0)
+            inp = bgr_img.astype('float32') 
+            inp = np.expand_dims(inp, 0)
         else:
             ## Padded resize
             h, w, _ = bgr_img.shape
@@ -371,28 +365,31 @@ class YOLOv9(object):
             inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
 
 
+        # infer for int8
         confidence_score = 0.6
         ## Inference
         t1 = time.perf_counter_ns()
-        # num_detection, nmsed_bboxes, nmsed_scores, nmsed_classes = self.model.run(inp)
         bboxes, scores = self.model.run(inp)
         cats = np.argmax(scores, axis=2)
         scores = np.reshape(np.max(scores, axis=2), -1) 
         bboxes = np.reshape(bboxes, (-1, 4))
         nmsed_bboxes = bboxes[scores > confidence_score]
         nmsed_scores  = scores[scores > confidence_score]
-        # import ipdb; ipdb.set_trace()
         cats = np.reshape(cats, -1)
         nmsed_classes = cats[scores > confidence_score]
         t2 = time.perf_counter_ns()
-        # keep = nms(result[0], result[1])
         num_detection = nmsed_bboxes.shape[0]
 
-        ## Apply NMS
+        # ## infer for fp32
+        # t1 = time.perf_counter_ns()
+        # num_detection, nmsed_bboxes, nmsed_scores, nmsed_classes = self.model.run(inp)
+        # t2 = time.perf_counter_ns()
         # num_detection = num_detection[0][0]
         # nmsed_bboxes  = nmsed_bboxes[0]
         # nmsed_scores  = nmsed_scores[0]
         # nmsed_classes  = nmsed_classes[0]
+
+
         print('Detected {} object(s)'.format(num_detection))
         # Rescale boxes from img_size to im0 size
         _, _, height, width = inp.shape
@@ -428,8 +425,8 @@ if __name__ == '__main__':
         model = YOLOv9(640, 640, False, 4, opt.weights, opt.classes)
 
 
-    # image_root = 'images/samples'
-    image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
+    image_root = 'images/samples' # on msi
+    # image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
     out_root = 'images/infer' # on my orin
     image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
 
