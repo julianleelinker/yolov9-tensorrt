@@ -41,14 +41,14 @@ def load_yolov7_coco_image(cocodir, topn = None):
     return np.concatenate(datas, axis=0)
     
 
-# class MNISTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
-class MNISTEntropyCalibrator(trt.IInt8MinMaxCalibrator):
+class MNISTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
+# class MNISTEntropyCalibrator(trt.IInt8MinMaxCalibrator):
     def __init__(self, training_data, cache_file, batch_size=64):
 
         # Whenever you specify a custom constructor for a TensorRT class,
         # you MUST call the constructor of the parent explicitly.
-        # trt.IInt8EntropyCalibrator2.__init__(self)
-        trt.IInt8MinMaxCalibrator.__init__(self)
+        trt.IInt8EntropyCalibrator2.__init__(self)
+        # trt.IInt8MinMaxCalibrator.__init__(self)
 
         self.cache_file = cache_file
         self.batch_size = batch_size
@@ -102,11 +102,12 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
         config = builder.create_builder_config()
         config.max_workspace_size = 1 << 30  # 1GB
         config.set_flag(trt.BuilderFlag.INT8)
+        config.set_flag(trt.BuilderFlag.FP16)
         config.set_flag(trt.BuilderFlag.GPU_FALLBACK)
         
         # Define optimization profiles
         profile = builder.create_optimization_profile()
-        profile.set_shape("input", (1, 3, 640, 640), (3, 3, 640, 640), (4, 3, 640, 640))
+        profile.set_shape("input", (1, 3, 640, 640), (3, 3, 640, 640), (3, 3, 640, 640))
         config.add_optimization_profile(profile)
         
         # Specify the calibration dataset and create a calibrator
@@ -128,16 +129,15 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
             f.write(engine.serialize())
 
 def main():
-    model_name = 'c7-converted'
+    model_name = 'c7-converted-nms'
     # model_name = '/home/ubuntu/julian/tiip/c7-converted'
     onnx_file_path = f'{model_name}.onnx'
-    input_shape = (1, 3, 640, 640)  # Adjust based on your calibration dataset
 
     calibration_cache = f'{model_name}-int8.cache'
     engine_file_path  = f'{model_name}-int8.trt'
 
-    # calib_image_path = 'images/samples/'
-    calib_image_path = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/'
+    calib_image_path = 'images/samples/'
+    # calib_image_path = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/'
     calibrator = MNISTEntropyCalibrator(calib_image_path, cache_file=calibration_cache)
 
     build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator)

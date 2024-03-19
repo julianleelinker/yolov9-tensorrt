@@ -19,59 +19,6 @@ TRT_LOGGER = trt.Logger()
 trt.init_libnvinfer_plugins(TRT_LOGGER, '')
 
 
-def compute_iou(boxA, boxB):
-    # Determine the coordinates of the intersection rectangle
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-
-    # Compute the area of intersection
-    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
-
-    # Compute the area of both the prediction and ground-truth rectangles
-    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
-    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
-
-    # Compute the intersection over union by taking the intersection
-    # area and dividing it by the sum of prediction + ground-truth
-    # areas - the interesection area
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-
-    return iou
-
-def nms(bboxes, scores, score_threshold=0.4, iou_threshold=0.6):
-    # Flatten the bboxes and scores array for simplicity
-    bboxes = bboxes.reshape(-1, 4)
-    scores = scores.flatten()
-
-    # Filter out bboxes with scores below threshold
-    idxs = np.where(scores > score_threshold)[0]
-    filtered_bboxes = bboxes[idxs]
-    filtered_scores = scores[idxs]
-
-    # Sort the indices of the filtered_scores in descending order
-    idxs = np.argsort(filtered_scores)[::-1]
-
-    keep = []
-    while len(idxs) > 0:
-        # Take the top-scored bounding box and add its index to the keep list
-        current_idx = idxs[0]
-        keep.append(current_idx)
-
-        if len(idxs) == 1:
-            break
-
-        # Compute IoU of the top-scored bounding box with all others
-        ious = np.array([compute_iou(filtered_bboxes[current_idx], filtered_bboxes[i]) for i in idxs[1:]])
-
-        # Keep only boxes with IoU less than the threshold
-        idxs = idxs[1:][ious < iou_threshold]
-
-    # Return the indices of the bounding boxes to keep
-    return keep
-
-
 # Simple helper data class that's a little nicer to use than a 2-tuple.
 class HostDeviceMem(object):
     def __init__(self, host_mem, device_mem):
@@ -365,29 +312,13 @@ class YOLOv9(object):
             inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
 
 
-        # infer for int8
-        confidence_score = 0.6
-        ## Inference
         t1 = time.perf_counter_ns()
-        bboxes, scores = self.model.run(inp)
-        cats = np.argmax(scores, axis=2)
-        scores = np.reshape(np.max(scores, axis=2), -1) 
-        bboxes = np.reshape(bboxes, (-1, 4))
-        nmsed_bboxes = bboxes[scores > confidence_score]
-        nmsed_scores  = scores[scores > confidence_score]
-        cats = np.reshape(cats, -1)
-        nmsed_classes = cats[scores > confidence_score]
+        num_detection, nmsed_bboxes, nmsed_scores, nmsed_classes = self.model.run(inp)
         t2 = time.perf_counter_ns()
-        num_detection = nmsed_bboxes.shape[0]
-
-        # ## infer for fp32
-        # t1 = time.perf_counter_ns()
-        # num_detection, nmsed_bboxes, nmsed_scores, nmsed_classes = self.model.run(inp)
-        # t2 = time.perf_counter_ns()
-        # num_detection = num_detection[0][0]
-        # nmsed_bboxes  = nmsed_bboxes[0]
-        # nmsed_scores  = nmsed_scores[0]
-        # nmsed_classes  = nmsed_classes[0]
+        num_detection = num_detection[0][0]
+        nmsed_bboxes  = nmsed_bboxes[0]
+        nmsed_scores  = nmsed_scores[0]
+        nmsed_classes  = nmsed_classes[0]
 
 
         print('Detected {} object(s)'.format(num_detection))
@@ -427,7 +358,8 @@ if __name__ == '__main__':
 
     image_root = 'images/samples' # on msi
     # image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
-    out_root = 'images/infer' # on my orin
+
+    out_root = 'images/infer' 
     image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
 
     # select random 100 images

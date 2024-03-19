@@ -41,6 +41,7 @@ unconverted 36 ms
 converted 30 ms
 add postprocess 30 ms
 add preprocess 45 ms
+converted int8 20 ms (without nms)
 
 
 # environment for running object_detector_trt_nms.py on orin
