@@ -7,54 +7,6 @@ import pycuda.autoinit
 import sys, os
 TRT_LOGGER = trt.Logger()
 
-'''
-class CalibrationDataset(object):
-    def __init__(self, calibration_data_path):
-        # Load or define your calibration dataset here
-        # This should be representative of your input data distribution
-        self.data = np.load(calibration_data_path)
-        self.index = 0
-
-    def get_batch(self, batch_size):
-        if self.index + batch_size > len(self.data):
-            self.index = 0  # Start over if we run out of data
-        batch = self.data[self.index:self.index + batch_size]
-        self.index += batch_size
-        return batch  # Return a batch of data for calibration
-
-class MyInt8Calibrator(trt.IInt8EntropyCalibrator2):
-    def __init__(self, calibration_dataset, input_shape, cache_file='calibration_cache.bin'):
-        super(MyInt8Calibrator, self).__init__()
-        self.dataset = calibration_dataset
-        self.batch_size = input_shape[0]
-        self.input_shape = input_shape
-        self.cache_file = cache_file
-        self.current_batch = np.zeros(input_shape, dtype=np.float32)
-    
-    def get_batch_size(self):
-        return self.batch_size
-    
-    def get_batch(self, names, p_str=None):
-        batch = self.dataset.get_batch(self.batch_size)
-        if not batch.size:  # Check if we've run out of data
-            return None
-        np.copyto(self.current_batch, batch)
-        return [int(self.current_batch.ctypes.data)]
-    
-    def read_calibration_cache(self):
-        # This function is called by TensorRT to load the calibration cache
-        try:
-            with open(self.cache_file, 'rb') as f:
-                return f.read()
-        except:
-            return None
-    
-    def write_calibration_cache(self, cache):
-        # This function is called by TensorRT to save the calibration cache
-        with open(self.cache_file, 'wb') as f:
-            f.write(cache)
-'''
-
 
 def load_yolov7_coco_image(cocodir, topn = None):
     
@@ -75,28 +27,6 @@ def load_yolov7_coco_image(cocodir, topn = None):
         if (i + 1) % 200 == 0:
             print(f"Load {i + 1} / {len(files)} ...")
 
-        '''
-        img = cv2.imread(os.path.join(cocodir, file))
-        from_ = img.shape[1], img.shape[0]
-        to_   = 640, 640
-        scale = min(to_[0] / from_[0], to_[1] / from_[1])
-
-        # low accuracy
-        # M = np.array([
-        #     [scale, 0, 16],
-        #     [0, scale, 16],  # same to pytorch
-        # ])
-
-        # more accuracy
-        M = np.array([
-            [scale, 0, -scale * from_[0]  * 0.5  + to_[0] * 0.5 + scale * 0.5 - 0.5 + 16],
-            [0, scale, -scale * from_[1] * 0.5 + to_[1] * 0.5 + scale * 0.5 - 0.5 + 16],  # same to pytorch
-        ])
-        input = cv2.warpAffine(img, M, (672, 672), borderValue=(114, 114, 114))
-        input = input[..., ::-1].transpose(2, 0, 1)[None]   # BGR->RGB, HWC->CHW, CHW->1CHW
-        input = (input / 255.0).astype(np.float32)
-        datas.append(input)
-        '''
         img = cv2.imread(os.path.join(cocodir, file))
         h, w, _ = img.shape
         scale = min(imgsz[0]/w, imgsz[1]/h)
@@ -106,7 +36,6 @@ def load_yolov7_coco_image(cocodir, topn = None):
         inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (nw, nh))
         inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
         inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
-        # print(np.mean(inp))
         datas.append(inp)
         
     return np.concatenate(datas, axis=0)
@@ -199,9 +128,8 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
             f.write(engine.serialize())
 
 def main():
-    # onnx_file_path = 'fp32-nms.onnx'
-    # model_name = 'c7-converted'
-    model_name = '/home/ubuntu/julian/tiip/c7-converted'
+    model_name = 'c7-converted'
+    # model_name = '/home/ubuntu/julian/tiip/c7-converted'
     onnx_file_path = f'{model_name}.onnx'
     input_shape = (1, 3, 640, 640)  # Adjust based on your calibration dataset
 
@@ -211,9 +139,6 @@ def main():
     # calib_image_path = 'images/samples/'
     calib_image_path = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/'
     calibrator = MNISTEntropyCalibrator(calib_image_path, cache_file=calibration_cache)
-
-    # calibration_dataset_path = 'path_to_your_calibration_dataset.npy'  # Update this path
-    # calibrator = MyInt8Calibrator(CalibrationDataset(calibration_dataset_path), input_shape)
 
     build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator)
 

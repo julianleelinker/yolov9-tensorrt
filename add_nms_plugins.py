@@ -4,6 +4,8 @@ import onnx
 import numpy as np 
 import onnx_graphsurgeon as gs 
 import argparse
+
+
 def create_attrs(topK, keepTopK):
     attrs = {}
     attrs["shareLocation"] = 1 # Default for yolor
@@ -17,6 +19,7 @@ def create_attrs(topK, keepTopK):
     attrs["clipBoxes"] = 0
     attrs["plugin_version"] = "1"
     return attrs
+
 
 def create_and_add_plugin_node(graph, topK, keepTopK):
     
