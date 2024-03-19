@@ -51,3 +51,11 @@ sudo apt install libboost-all-dev --fix-missing
 export CPATH=$CPATH:/usr/local/cuda-11.4/targets/aarch64-linux/include
 export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/cuda-11.4/targets/aarch64-linux/lib
 pip install pycuda==2022.2
+
+
+# tritonserver inference
+cd /home/ubuntu/tritonserver/bin
+./tritonserver \
+  --model-repository=/home/ubuntu/julian/work/yolov9-tensorrt/triton/models/ \
+  --backend-directory=/home/ubuntu/tritonserver/backends
+python triton_infer.py

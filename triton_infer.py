@@ -93,18 +93,18 @@ triton_client = grpcclient.InferenceServerClient(
 # image_root = '/home/julian/data/indus-innov/0216/images_0216/kaohsiung5gsmartcitydemo/tiip-s4-1000/tiip-s4-1000/'
 # image_root = '/home/julian/data/indus-innov/images/kaohsiung5gsmartcitydemo/tiip-s4-1000/tiip-s4-1000/'
 image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on my orin
-# out_root = '/home/julian/work/yolov9-tensorrt/triton-trt-infer'
-out_root = '/home/ubuntu/julian/tiip/infer/' # on my orin
-model_name = 'yolov9-c3'
+out_root = 'images/infer/'
+# model_name = 'yolov9-c7-int8'
+model_name = 'yolov9-c7-converted-nms-int8'
 
 
 # load all *.jpg under image_root as list
 image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
 
 # select random 10 images
-# infer_list = np.random.choice(image_list, 10)
+# infer_list = image_list
+infer_list = np.random.choice(image_list, 100)
 # infer_list = image_list[:10]
-infer_list = image_list
 pathlib.Path(out_root).mkdir(exist_ok=True)
 
 total_elapsed_time_ns = 0

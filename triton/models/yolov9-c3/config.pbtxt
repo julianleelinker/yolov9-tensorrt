@@ -1,4 +1,4 @@
-name: "yolov9"
+name: "yolov9-c3"
 platform: "tensorrt_plan"
 dynamic_batching { }
 input [

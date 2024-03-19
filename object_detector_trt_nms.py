@@ -356,8 +356,8 @@ if __name__ == '__main__':
         model = YOLOv9(640, 640, False, 4, opt.weights, opt.classes)
 
 
-    image_root = 'images/samples' # on msi
-    # image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
+    # image_root = 'images/samples' # on msi
+    image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
 
     out_root = 'images/infer' 
     image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
