@@ -106,13 +106,11 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights/best.pt', help='weights path')
     parser.add_argument('--output', type=str, default='weights/yolov9.onnx', help='output ONNX model path')
     parser.add_argument('--max_size', type=int, default=640, help='max size of input image')
-    parser.add_argument('--data', type=str, default="./data/coco.yaml", help='max size of input image')
     parser.add_argument('--e2e', action='store_true', help='Enable end-to-end mode')
     opt = parser.parse_args()
 
     model_weights = opt.weights 
     output_model_path = opt.output
-    data = opt.data
     max_size = opt.max_size
     device = torch.device('cpu')
 

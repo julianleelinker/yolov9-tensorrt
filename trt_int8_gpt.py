@@ -8,7 +8,7 @@ import sys, os
 TRT_LOGGER = trt.Logger()
 
 
-def load_yolov7_coco_image(cocodir, topn = None):
+def load_yolov7_coco_image(cocodir, topn = None, e2e=False):
     
     files = os.listdir(cocodir)
     files = [file for file in files if file.endswith(".jpg")]
@@ -28,14 +28,20 @@ def load_yolov7_coco_image(cocodir, topn = None):
             print(f"Load {i + 1} / {len(files)} ...")
 
         img = cv2.imread(os.path.join(cocodir, file))
-        h, w, _ = img.shape
-        scale = min(imgsz[0]/w, imgsz[1]/h)
-        inp = np.zeros((imgsz[1], imgsz[0], 3), dtype = np.float32)
-        nh = int(scale * h)
-        nw = int(scale * w)
-        inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (nw, nh))
-        inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
-        inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
+
+        if e2e:
+            inp = img.astype('float32') 
+            inp = np.expand_dims(inp, 0)
+        else:
+            h, w, _ = img.shape
+            scale = min(imgsz[0]/w, imgsz[1]/h)
+            inp = np.zeros((imgsz[1], imgsz[0], 3), dtype = np.float32)
+            nh = int(scale * h)
+            nw = int(scale * w)
+            inp[: nh, :nw, :] = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), (nw, nh))
+            inp = inp.astype('float32') / 255.0  # 0 - 255 to 0.0 - 1.0
+            inp = np.expand_dims(inp.transpose(2, 0, 1), 0)
+
         datas.append(inp)
         
     return np.concatenate(datas, axis=0)
@@ -43,7 +49,7 @@ def load_yolov7_coco_image(cocodir, topn = None):
 
 class MNISTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
 # class MNISTEntropyCalibrator(trt.IInt8MinMaxCalibrator):
-    def __init__(self, training_data, cache_file, batch_size=64):
+    def __init__(self, training_data, cache_file, batch_size=64, e2e=False):
 
         # Whenever you specify a custom constructor for a TensorRT class,
         # you MUST call the constructor of the parent explicitly.
@@ -58,7 +64,7 @@ class MNISTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
         if not os.path.exists(cache_file):
 
             # Allocate enough memory for a whole batch.
-            self.data = load_yolov7_coco_image(training_data, 1000)
+            self.data = load_yolov7_coco_image(training_data, 1000, e2e=e2e)
             print(self.data.shape)
             print(self.data[0].nbytes * self.batch_size)
             self.device_input = cuda.mem_alloc(self.data[0].nbytes * self.batch_size)
@@ -94,7 +100,7 @@ class MNISTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
             f.write(cache)
 
 
-def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, device=0):
+def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, device=0, e2e=False):
     TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)
     
     with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
@@ -107,7 +113,10 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
         
         # Define optimization profiles
         profile = builder.create_optimization_profile()
-        profile.set_shape("input", (1, 3, 640, 640), (3, 3, 640, 640), (3, 3, 640, 640))
+        if e2e:
+            profile.set_shape("input", (1, 1280, 1920, 3), (3, 1280, 1920, 3), (3, 1280, 1920, 3))
+        else:
+            profile.set_shape("input", (1, 3, 640, 640), (3, 3, 640, 640), (3, 3, 640, 640))
         config.add_optimization_profile(profile)
         
         # Specify the calibration dataset and create a calibrator
@@ -129,18 +138,22 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
             f.write(engine.serialize())
 
 def main():
-    model_name = 'c7-converted-nms'
-    # model_name = '/home/ubuntu/julian/tiip/c7-converted'
-    onnx_file_path = f'{model_name}.onnx'
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--onnx', type=str, help='onnx path')
+    parser.add_argument('--e2e', action='store_true', help='Enable end-to-end mode')
+    parser.add_argument('--calib_path', type=str, help='calibration image path')
+    opt = parser.parse_args()
 
-    calibration_cache = f'{model_name}-int8.cache'
-    engine_file_path  = f'{model_name}-int8.trt'
+    onnx_file_path = opt.onnx
+    calibration_cache = onnx_file_path.replace('.onnx', '-int8.cache')
+    engine_file_path = onnx_file_path.replace('.onnx', '-int8.trt')
 
-    calib_image_path = 'images/samples/'
+    # calib_image_path = 'images/samples/'
     # calib_image_path = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/'
-    calibrator = MNISTEntropyCalibrator(calib_image_path, cache_file=calibration_cache)
+    calibrator = MNISTEntropyCalibrator(opt.calib_path, cache_file=calibration_cache, e2e=opt.e2e)
 
-    build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator)
+    build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, e2e=opt.e2e)
 
 
 if __name__ == "__main__":
