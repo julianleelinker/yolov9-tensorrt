@@ -4,5 +4,6 @@
 *.trt
 *.pyc
 *.plan
+*.cache
 images/*
 triton-trt-infer/*
