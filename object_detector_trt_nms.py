@@ -345,9 +345,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='weights/best.pt', help='weights path')
     parser.add_argument('--classes', type=str, default='data/coco.names', help='classes name file path')
-    # parser.add_argument('--max_size', type=int, default=640, help='max size of input image')
     parser.add_argument('--e2e', action='store_true', help='Enable end-to-end mode')
-    # parser.add_argument('--img_test', type=str, default='images/zidane.jpg', help='image test path')
+    parser.add_argument('--infer_path', type=str, help='input image path for inference')
     opt = parser.parse_args()
 
     if opt.e2e:
@@ -357,10 +356,10 @@ if __name__ == '__main__':
 
 
     # image_root = 'images/samples' # on msi
-    image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
+    # image_root = '/home/ubuntu/julian/tiip/data/tiip-s4-1000/tiip-s4-1000/' # on orin
 
     out_root = 'images/infer' 
-    image_list = sorted(pathlib.Path(image_root).glob('*.jpg'))
+    image_list = sorted(pathlib.Path(opt.infer_path).glob('*.jpg'))
 
     # select random 100 images
     num_data = 100
