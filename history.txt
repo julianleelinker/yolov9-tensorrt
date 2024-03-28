@@ -33,7 +33,6 @@ python3 object_detector_trt_nms.py --classes data/tiip.names --weight c3-convert
 python torch2onnx.py --weights c7-converted.pt --output c7-converted.onnx
 python add_nms_plugins.py --model c7-converted.onnx
 /usr/src/tensorrt/bin/trtexec --onnx=c7-converted-nms.onnx --saveEngine=c7-converted-nms.trt --minShapes=input:1x640x640x3 --maxShapes=input:3x640x640x3 --optShapes=input:3x640x640x3 --verbose --device=0
-/usr/src/tensorrt/bin/trtexec --onnx=c7-converted-nms.onnx --saveEngine=c7-converted-nms.trt --minShapes=input:1x3x640x640 --maxShapes=input:3x3x640x640 --optShapes=input:3x3x640x640 --verbose --device=0
 python3 object_detector_trt_nms.py --classes data/tiip.names --weight c7-converted-nms.trt
 
 
@@ -43,7 +42,6 @@ add postprocess 30 ms
 add preprocess (e2e) 45 ms
 
 converted int8 20
-converted e2e int8 30 ms
 
 
 on orin
@@ -66,3 +64,7 @@ cd /home/ubuntu/tritonserver/bin
   --model-repository=/home/ubuntu/julian/work/yolov9-tensorrt/triton/models/ \
   --backend-directory=/home/ubuntu/tritonserver/backends
 python triton_infer.py
+
+
+# use yolov9-qat branch result 
+/usr/src/tensorrt/bin/trtexec --onnx=qat_ep_5_ap_0.7026_best-converted-end2end.onnx --saveEngine=qat_ep_5_ap_0.7026_best-converted-end2end.trt --explicitBatch --minShapes=images:1x3x640x640 --optShapes=images:3x3x640x640 --maxShapes=images:3x3x640x640 --verbose --device=0 --int8 --fp16

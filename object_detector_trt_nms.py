@@ -224,9 +224,12 @@ class TrtModelNMS(object):
         # import ipdb; ipdb.set_trace()
         self.inputs[0].host[:allocate_place] = input.flatten(order='C').astype(np.float32)
         self.context.set_binding_shape(0, input.shape)
+        t1 = time.perf_counter_ns()
         trt_outputs = do_inference(
             self.context, bindings=self.bindings,
             inputs=self.inputs, outputs=self.outputs, stream=self.stream)
+        t2 = time.perf_counter_ns()
+        print(f'inference time: {(t2-t1)/1_000_000} ms')
         # print(self.inputs, self.outputs, self.bindings, self.stream, self.input_shapes, self.out_shapes, self.out_names, self.max_batch_size)
         # Reshape TRT outputs to original shape instead of flattened array
         # print(trt_outputs[0].shape)
@@ -379,5 +382,5 @@ if __name__ == '__main__':
         total_elapsed_time_ns += infer_time
 
     num_data = len(infer_list)
-    avg_elapsed_time_sec = total_elapsed_time_ns / 1_000_000_000 / num_data
-    print(f"averaged infer time: ({avg_elapsed_time_sec} seconds) ({num_data} samples)")
+    avg_elapsed_time_ms = total_elapsed_time_ns / 1_000_000 / len(infer_list) 
+    print(f"averaged infer time: ({avg_elapsed_time_ms} ms) ({len(infer_list)} samples)")
