@@ -1,5 +1,5 @@
 '''
-copy this file to the root of the trex directory
+copy this file under trt-engine-explorer
 '''
 
 import graphviz

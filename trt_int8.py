@@ -110,13 +110,18 @@ def build_and_save_engine_int8(onnx_file_path, engine_file_path, calibrator, dev
         config.set_flag(trt.BuilderFlag.INT8)
         config.set_flag(trt.BuilderFlag.FP16)
         config.set_flag(trt.BuilderFlag.GPU_FALLBACK)
+
+        # config.DLA_core = 1
+        # config.dla_core = 1
         
         # Define optimization profiles
         profile = builder.create_optimization_profile()
+        input_name = 'input' # for yolov9-tensorrt model
+        input_name = 'images' # for yolov9 qat branch model
         if e2e:
-            profile.set_shape("input", (1, 1280, 1920, 3), (3, 1280, 1920, 3), (3, 1280, 1920, 3))
+            profile.set_shape(input_name, (1, 1280, 1920, 3), (3, 1280, 1920, 3), (3, 1280, 1920, 3))
         else:
-            profile.set_shape("input", (1, 3, 640, 640), (3, 3, 640, 640), (3, 3, 640, 640))
+            profile.set_shape(input_name, (1, 3, 640, 640), (3, 3, 640, 640), (3, 3, 640, 640))
         config.add_optimization_profile(profile)
         
         # Specify the calibration dataset and create a calibrator
