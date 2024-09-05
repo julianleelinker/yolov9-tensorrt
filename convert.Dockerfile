@@ -1,5 +1,5 @@
 # syntax = docker/dockerfile:1.2
-FROM nvcr.io/nvidia/tensorrt:22.12-py3
+FROM nvcr.io/nvidia/tensorrt:23.01-py3
 
 RUN pip install --upgrade pip
 RUN pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113

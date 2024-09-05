@@ -43,6 +43,7 @@ def allocate_buffers(engine, max_boxes, total_classes):
     max_batch_size = engine.get_profile_shape(0, 0)[2][0]
     print('Profile shape: ', engine.get_profile_shape(0, 0))
     # max_batch_size = 1
+    import ipdb; ipdb.set_trace()
     for binding in engine:
         binding_shape = engine.get_binding_shape(binding)
         #Fix -1 dimension for proper memory allocation for batch_size > 1
@@ -50,6 +51,10 @@ def allocate_buffers(engine, max_boxes, total_classes):
             max_width = engine.get_profile_shape(0, 0)[2][3]
             max_height = engine.get_profile_shape(0, 0)[2][2]
             size = max_batch_size * max_width * max_height * 3
+            print(max_width)
+            print(max_height)
+            print(max_batch_size)
+            exit(0)
         else:
             size = max_batch_size * max_boxes * (total_classes + 5)
         dtype = trt.nptype(engine.get_binding_dtype(binding))
@@ -79,19 +84,20 @@ def allocate_buffers_nms(engine, max_width, max_height, max_batch_size):
     out_names = []
     # max_batch_size = engine.get_profile_shape(0, 0)[2][0]
     print('Profile shape: ', engine.get_profile_shape(0, 0))
-    # import ipdb; ipdb.set_trace()
     # max_batch_size = 1
     for binding in engine:
         binding_shape = engine.get_binding_shape(binding)
         print('binding:', binding, '- binding_shape:', binding_shape)
         #Fix -1 dimension for proper memory allocation for batch_size > 1
-        if binding == 'input':
+        if binding == 'images':
             # max_width = engine.get_profile_shape(0, 0)[2][3]
             # max_height = engine.get_profile_shape(0, 0)[2][2]
             size = max_batch_size * max_width * max_height * 3
+            # import ipdb; ipdb.set_trace()
         else:
             binding_shape = (max_batch_size,) + binding_shape[1:]
             size = trt.volume(binding_shape)
+
         dtype = trt.nptype(engine.get_binding_dtype(binding))
         # Allocate host and device buffers
         host_mem = cuda.pagelocked_empty(size, dtype)
@@ -350,12 +356,15 @@ if __name__ == '__main__':
     parser.add_argument('--classes', type=str, default='data/coco.names', help='classes name file path')
     parser.add_argument('--e2e', action='store_true', help='Enable end-to-end mode')
     parser.add_argument('--infer_path', type=str, help='input image path for inference')
+    parser.add_argument('--width', type=int, help='width')
+    parser.add_argument('--height', type=int, help='height')
     opt = parser.parse_args()
 
     if opt.e2e:
         model = YOLOv9(1920, 1280, True, 3, opt.weights, opt.classes)
     else:
-        model = YOLOv9(640, 640, False, 4, opt.weights, opt.classes)
+        # model = YOLOv9(640, 640, False, 4, opt.weights, opt.classes)
+        model = YOLOv9(opt.width, opt.height, False, 4, opt.weights, opt.classes)
 
 
     # image_root = 'images/samples' # on msi
@@ -374,6 +383,7 @@ if __name__ == '__main__':
     total_elapsed_time_ns = 0
     for image_path in infer_list:
         img = cv2.imread(str(image_path))
+        img = cv2.resize(img, (opt.width, opt.height))
         # image = Image.open(str(image_path)).convert("RGB")
         result_img, infer_time = model.detect(img)
         image_name = pathlib.Path(image_path).stem
